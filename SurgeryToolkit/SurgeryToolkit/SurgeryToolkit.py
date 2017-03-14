@@ -238,8 +238,53 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
   Uses ScriptedLoadableModuleTest base class, available at:
-  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py  
   """
+  """
+  @Raniem Alsaadi
+  This function is used to create the first test case which generates two fiducial lists one
+  with 8 points and the second one is created by adding noise to the first list and reorder the points
+  the second list just have 6 elements to test the registration with missing points and missed up order
+  """
+   def generatePointsTestCase1(self):
+     numPoints = 8
+     Sigma = 3
+     Scale = 100
+    rasFids = slicer.util.getNode('fromFiducials')
+    if rasFids == None:
+        rasFids = slicer.vtkMRMLMarkupsFiducialNode()
+        rasFids.SetName('fromFiducials')
+        slicer.mrmlScene.AddNode(rasFids)
+    rasFids.RemoveAllMarkups()
+
+    refFids = slicer.util.getNode('toFiducials')
+    if refFids == None:
+        refFids = slicer.vtkMRMLMarkupsFiducialNode()
+        refFids.SetName('toFiducials')
+        slicer.mrmlScene.AddNode(refFids)
+    refFids.RemoveAllMarkups()
+    refFids.GetDisplayNode().SetSelectedColor(1,1,0)
+
+    fromNormCoordinates = numpy.random.rand(numPoints, 3)
+    noise = numpy.random.normal(0.0, Sigma, numPoints*3)
+    # create temporary points
+    tempPoints = vtk.vtkPoints()
+    # create the reference points 
+    for i in range(numPoints):
+        x = (fromNormCoordinates[i, 0] - 0.5) * Scale
+        y = (fromNormCoordinates[i, 1] - 0.5) * Scale
+        z = (fromNormCoordinates[i, 2] - 0.5) * Scale
+        rasFids.AddFiducial(x, y, z)        
+
+    # shuffle the points by index of 2 then add noise and add them to refFids
+    for i in range(numPoints-2):
+      p = [0,0,0]
+      fiducials.GetNthFiducialPosition(i+2, p)
+      xx = p[0]+noise[i*3]
+      yy = p[1]+noise[i*3+1]
+      zz = p[2]+noise[i*3+2]      
+      refFids.AddFiducial(xx, yy, zz)
+
 
   def setUp(self):
     """ Do whatever is needed to reset the state - typically a scene clear will be enough.
