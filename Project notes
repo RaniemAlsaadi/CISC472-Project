@@ -1,0 +1,97 @@
+Send Progress emails before Tuesday and before Friday morning every week (6 emails total, 5% each)
+Presentation with 3 slides (Problem, Solution, Results using graphs)
+--------------------------------------------------------------
+Navigated Surgery Toolkit Project: Its solvable! 
+- John will write the logic function that tries all the combinations and permutations
+- I will do everything else so building tests, generating fiducials, creating the presentation slides. 
+
+So far with the Homework assignments, we spent quite some time registering two fiducial lists.
+For this project, use brute force approach to register a point list to another point list with missing points and missed up order. 
+We have two lists of points, one is called ‘from fiducials’ and the other is called ‘to fiducials’.
+We should start writing a test first, so in our module we have to make sure that when we press the reload and test button, 
+it should create initially two fiducial lists but later it can create more pairs to test different cases but for now we’ll 
+start with 2. 
+
+In that first test, create one list with for example 8 fiducials and another list with 6 and in different order.
+We know that point coordinates should register well because we start from 8 points and then we create 6 by putting the 5th
+to the 1st place, 3rd to 2nd place, 8th to 3rd place, so pick 6 and we know they are going to register because we are basically
+building one list based on the original list. Therefore, we know there is a solution. 
+
+
+Then we will have to write a function in the logic module because this way we call it from anywhere and call it from another
+module as well. So this function takes the two lists as input and it provide the registration and RMSE as an output—> computed 
+after registration, the RMSE of the difference of the distance between the registering points. So this is going to be Its going
+to be a lot of registrations for just finding the best one from the list of 8 and list of 6 so unlike the homework assignments
+where we always ran one landmark registration to register one point list to another point list. 
+
+And inside that function, take the smallest number of the two lists, in our example 6 because we have 8 and 6 points in the 
+two lists, so we pick the 6 points and try every possible combinations (pick 6 out of the 8) and try all permutations of the 
+(pick 6) so that would be a lot and we are trying to find the best registration —> check what is the smallest (root mean 
+square distance) and not the average distance after which registration.
+
+When we construct our test case, so when we create 8 random points and then create 6 other points randomly selected from the 8,
+we have to keep the solution for example we should know which one is which one pair, so that in our logic function(the one
+which is really useful) gives us the result, we can actually compare it with the ground truth so with the true pair, so we can 
+verify that our logic function works and that it gives the correct solution. And then once that works with one test case, 
+then we should just run a bunch of tests (change the parameters in the test function to have more points) 
+
+At the end we can create that says something as "as we increase the number of points, its going to slow down and this is
+the range of points that works with our solution. 
+
+We can use our algorithm from the logic function or graphical user interface
+1.	Fiducial Registration Wizard Source code is available in C++ (hard)
+2.	Create two fiducials selectors, warping is not needed so first just handle the rigid and then later you can allow 
+similarity and create a button that just says apply. Creating the fiducials is just when you click the reload and test button. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+And inside that function, take the smallest number of
+the two lists, in our example 6 because we have 8 and 6 points in the two
+lists, so we pick the 6 points and try every possible combinations (pick 6 out
+of the 8) and try all permutations of the (pick 6 ) so that would be a lot and
+we are trying to find the best registration —> check what is the smallest
+(root mean square distance) and not the average distance after which
+registration
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Then we will have to write a function in the logic
+module because this way we call it from anywhere and call it from another module
+as well. So this function takes the two lists as input and it provide the
+registration and RMSE as an output—> computed after registration, the RMSE
+of the difference of the distance between the registering points. 
+
+
