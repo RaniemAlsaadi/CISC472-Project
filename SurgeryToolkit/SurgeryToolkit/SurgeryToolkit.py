@@ -3,6 +3,7 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+import numpy
 
 #
 # SurgeryToolkit
@@ -19,14 +20,6 @@ class SurgeryToolkit(ScriptedLoadableModule):
     self.parent.categories = ["Examples"]
     self.parent.dependencies = []
     self.parent.contributors = ["John Doe (AnyWare Corp.)"] # replace with "Firstname Lastname (Organization)"
-    self.parent.helpText = """
-    This is an example of scripted loadable module bundled in an extension.
-    It performs a simple thresholding on the input volume and optionally captures a screenshot.
-    """
-    self.parent.acknowledgementText = """
-    This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc.
-    and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.
-""" # replace with organization, grant and thanks.
 
 #
 # SurgeryToolkitWidget
@@ -137,153 +130,118 @@ class SurgeryToolkitWidget(ScriptedLoadableModuleWidget):
 #
 
 class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
-  """This class should implement all the actual
-  computation done by your module.  The interface
-  should be such that other python code can import
-  this class and make use of the functionality without
-  requiring an instance of the Widget.
-  Uses ScriptedLoadableModuleLogic base class, available at:
-  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
-  """
-
-  def hasImageData(self,volumeNode):
-    """This is an example logic method that
-    returns true if the passed in volume
-    node has valid image data
     """
-    if not volumeNode:
-      logging.debug('hasImageData failed: no volume node')
-      return False
-    if volumeNode.GetImageData() is None:
-      logging.debug('hasImageData failed: no image data in volume node')
-      return False
-    return True
-
-  def isValidInputOutputData(self, inputVolumeNode, outputVolumeNode):
-    """Validates if the output is not the same as input
+        @Tamas
+        I would start by creating a python list with the indices of the longer fiducial list: [1,2,3,...].
+        If there are N number of fiducials in the smaller fiducial list, I would compute the permutations of all
+        N-element combinations of the longer fiducial list indices. Then I would run the landmark registration on all
+        these permutations, and record the FRE. The combination/permutation of the lowest FRE value is probably the right one.
+        To generate permutations and combinations, google python permutation and python combination.
     """
-    if not inputVolumeNode:
-      logging.debug('isValidInputOutputData failed: no input volume node defined')
-      return False
-    if not outputVolumeNode:
-      logging.debug('isValidInputOutputData failed: no output volume node defined')
-      return False
-    if inputVolumeNode.GetID()==outputVolumeNode.GetID():
-      logging.debug('isValidInputOutputData failed: input and output volume is the same. Create a new volume for output to avoid this error.')
-      return False
-    return True
+    def fiduciaryRegistration(self):
+        """
+        @John Martin
+        Input: two fiducial lists
+        Output: Minimum RMSE after fiducial registration
+        Description:
+        Take the smaller of the two lists, try every possible combination of fiducial registration,
+        checking the average distance (root mean square distance), each time and find the minimum RMS Distance.
+        This is a greedy algorithm, and will be implmented as such.
+        """
+        x = 0
+        return x
 
-  def takeScreenshot(self,name,description,type=-1):
-    # show the message even if not taking a screen shot
-    slicer.util.delayDisplay('Take screenshot: '+description+'.\nResult is available in the Annotations module.', 3000)
+    def averageTransformedDistance(self, alphaPoints, betaPoints, alphaToBetaMatrix):
+        average = 0
+        num = 0
 
-    lm = slicer.app.layoutManager()
-    # switch on the type to get the requested window
-    widget = 0
-    if type == slicer.qMRMLScreenShotDialog.FullLayout:
-      # full layout
-      widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
-      # just the 3D window
-      widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog.Red:
-      # red slice window
-      widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog.Yellow:
-      # yellow slice window
-      widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog.Green:
-      # green slice window
-      widget = lm.sliceWidget("Green")
-    else:
-      # default to using the full window
-      widget = slicer.util.mainWindow()
-      # reset the type so that the node is set correctly
-      type = slicer.qMRMLScreenShotDialog.FullLayout
+        numberOfPoints = alphaPoints.GetNumberOfPoints()
+        bNum = betaPoints.GetNumberOfPoints()
 
-    # grab and convert to vtk image data
-    qpixMap = qt.QPixmap().grabWidget(widget)
-    qimage = qpixMap.toImage()
-    imageData = vtk.vtkImageData()
-    slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
+        if numberOfPoints != bNum:
+            logging.error('number of points in two lists do not match')
+            return -1
 
-    annotationLogic = slicer.modules.annotations.logic()
-    annotationLogic.CreateSnapShot(name, description, type, 1, imageData)
+        for i in range(numberOfPoints):
+            num = num + 1
+            a = alphaPoints.GetPoint(i)
+            pointA_Alpha = numpy.array(a)
+            pointA_Alpha = numpy.append(pointA_Alpha, 1)
+            pointA_Beta = alphaToBetaMatrix.MultiplyFloatPoint(pointA_Alpha)
+            b = betaPoints.GetPoint(i)
+            pointB_Beta = numpy.array(b)
+            pointB_Beta = numpy.append(pointB_Beta, 1)
+            distance = numpy.linalg.norm(pointA_Beta - pointB_Beta)
+            average = average+ (distance-average) / num
 
-  def run(self, inputVolume, outputVolume, imageThreshold, enableScreenshots=0):
-    """
-    Run the actual algorithm
-    """
+        return average
 
-    if not self.isValidInputOutputData(inputVolume, outputVolume):
-      slicer.util.errorDisplay('Input volume is the same as output volume. Choose a different output volume.')
-      return False
+    def rigidRegistration(self, alphaPoints, betaPoints, alphaToBetaMatrix):
+        landmarkTransform = vtk.vtkLandmarkTransform()
+        landmarkTransform.SetSourceLandmarks(alphaPoints)
+        landmarkTransform.SetTargetLandmarks(betaPoints)
+        landmarkTransform.SetModeToRigidBody()
+        landmarkTransform.Update()
+        landmarkTransform.GetMatrix(alphaToBetaMatrix)
 
-    logging.info('Processing started')
 
-    # Compute the thresholded output volume using the Threshold Scalar Volume CLI module
-    cliParams = {'InputVolume': inputVolume.GetID(), 'OutputVolume': outputVolume.GetID(), 'ThresholdValue' : imageThreshold, 'ThresholdType' : 'Above'}
-    cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True)
 
-    # Capture screenshot
-    if enableScreenshots:
-      self.takeScreenshot('SurgeryToolkitTest-Start','MyScreenshot',-1)
-
-    logging.info('Processing completed')
-
-    return True
 
 
 class SurgeryToolkitTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
   Uses ScriptedLoadableModuleTest base class, available at:
-  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py  
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
+
+
   """
   @Raniem Alsaadi
   This function is used to create the first test case which generates two fiducial lists one
   with 8 points and the second one is created by adding noise to the first list and reorder the points
   the second list just have 6 elements to test the registration with missing points and missed up order
   """
-   def generatePointsTestCase1(self):
-     numPoints = 8
-     Sigma = 3
-     Scale = 100
-    rasFids = slicer.util.getNode('fromFiducials')
-    if rasFids == None:
-        rasFids = slicer.vtkMRMLMarkupsFiducialNode()
-        rasFids.SetName('fromFiducials')
-        slicer.mrmlScene.AddNode(rasFids)
-    rasFids.RemoveAllMarkups()
 
-    refFids = slicer.util.getNode('toFiducials')
-    if refFids == None:
-        refFids = slicer.vtkMRMLMarkupsFiducialNode()
-        refFids.SetName('toFiducials')
-        slicer.mrmlScene.AddNode(refFids)
-    refFids.RemoveAllMarkups()
-    refFids.GetDisplayNode().SetSelectedColor(1,1,0)
+  def generatePoints(self, numPoints, Scale, Sigma):
+      rasFids = slicer.util.getNode('fromFiducials')
+      if rasFids == None:
+          rasFids = slicer.vtkMRMLMarkupsFiducialNode()
+          rasFids.SetName('fromFiducials')
+          slicer.mrmlScene.AddNode(rasFids)
+      rasFids.RemoveAllMarkups()
 
-    fromNormCoordinates = numpy.random.rand(numPoints, 3)
-    noise = numpy.random.normal(0.0, Sigma, numPoints*3)
-    # create temporary points
-    tempPoints = vtk.vtkPoints()
-    # create the reference points 
-    for i in range(numPoints):
-        x = (fromNormCoordinates[i, 0] - 0.5) * Scale
-        y = (fromNormCoordinates[i, 1] - 0.5) * Scale
-        z = (fromNormCoordinates[i, 2] - 0.5) * Scale
-        rasFids.AddFiducial(x, y, z)        
+      refFids = slicer.util.getNode('toFiducials')
+      if refFids == None:
+          refFids = slicer.vtkMRMLMarkupsFiducialNode()
+          refFids.SetName('toFiducials')
+          slicer.mrmlScene.AddNode(refFids)
+      refFids.RemoveAllMarkups()
+      refFids.GetDisplayNode().SetSelectedColor(1,1,0)
 
-    # shuffle the points by index of 2 then add noise and add them to refFids
-    for i in range(numPoints-2):
-      p = [0,0,0]
-      fiducials.GetNthFiducialPosition(i+2, p)
-      xx = p[0]+noise[i*3]
-      yy = p[1]+noise[i*3+1]
-      zz = p[2]+noise[i*3+2]      
-      refFids.AddFiducial(xx, yy, zz)
+      fromNormCoordinates = numpy.random.rand(numPoints, 3)
+
+      noise = numpy.random.normal(0.0, Sigma, numPoints*3)
+
+      #@John: It is not clear what the purpose of tempPoints is
+
+      # create temporary points
+      tempPoints = vtk.vtkPoints()
+
+      # create the reference points
+      for i in range(numPoints):
+          x = (fromNormCoordinates[i, 0] - 0.5) * Scale
+          y = (fromNormCoordinates[i, 1] - 0.5) * Scale
+          z = (fromNormCoordinates[i, 2] - 0.5) * Scale
+          rasFids.AddFiducial(x, y, z)
+
+          #@John: Only 6 fiducals created for 'toFiducials'
+          if not i > numPoints-3:
+              xx = x+noise[i*3]
+              yy = y+noise[i*3+1]
+              zz = z+noise[i*3+2]
+              refFids.AddFiducial(xx, yy, zz)
+
 
 
   def setUp(self):
@@ -313,22 +271,4 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
     #
     # first, get some data
     #
-    import urllib
-    downloads = (
-        ('http://slicer.kitware.com/midas3/download?items=5767', 'FA.nrrd', slicer.util.loadVolume),
-        )
-
-    for url,name,loader in downloads:
-      filePath = slicer.app.temporaryPath + '/' + name
-      if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
-        logging.info('Requesting download %s from %s...\n' % (name, url))
-        urllib.urlretrieve(url, filePath)
-      if loader:
-        logging.info('Loading %s...' % (name,))
-        loader(filePath)
-    self.delayDisplay('Finished with download and loading')
-
-    volumeNode = slicer.util.getNode(pattern="FA")
-    logic = SurgeryToolkitLogic()
-    self.assertIsNotNone( logic.hasImageData(volumeNode) )
-    self.delayDisplay('Test passed!')
+    self.generatePoints(8, 100, 3)
