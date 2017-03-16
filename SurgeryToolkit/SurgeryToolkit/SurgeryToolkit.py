@@ -4,7 +4,10 @@ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
 import numpy
+<<<<<<< HEAD
 from random import shuffle
+=======
+>>>>>>> e16cebc87dd7bff3eb1f76d6a7169042b82e4a06
 
 #
 # SurgeryToolkit
@@ -184,9 +187,15 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
         landmarkTransform.SetModeToRigidBody()
         landmarkTransform.Update()
         landmarkTransform.GetMatrix(alphaToBetaMatrix)
+<<<<<<< HEAD
 
 
 
+=======
+
+
+
+>>>>>>> e16cebc87dd7bff3eb1f76d6a7169042b82e4a06
 
 
 class SurgeryToolkitTest(ScriptedLoadableModuleTest):
@@ -206,7 +215,11 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
   added a new parameter diff: an integer number represent : size('fromFiducials') - size('toFiducials')
   """
 
+<<<<<<< HEAD
   def generatePoints1(self, numPoints,diff, Scale, Sigma):
+=======
+  def generatePoints(self, numPoints, Scale, Sigma):
+>>>>>>> e16cebc87dd7bff3eb1f76d6a7169042b82e4a06
       rasFids = slicer.util.getNode('fromFiducials')
       if rasFids == None:
           rasFids = slicer.vtkMRMLMarkupsFiducialNode()
@@ -225,7 +238,16 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
       fromNormCoordinates = numpy.random.rand(numPoints, 3)
 
       noise = numpy.random.normal(0.0, Sigma, numPoints*3)
+<<<<<<< HEAD
           
+=======
+
+      #@John: It is not clear what the purpose of tempPoints is
+
+      # create temporary points
+      tempPoints = vtk.vtkPoints()
+
+>>>>>>> e16cebc87dd7bff3eb1f76d6a7169042b82e4a06
       # create the reference points
       for i in range(numPoints):
           x = (fromNormCoordinates[i, 0] - 0.5) * Scale
@@ -234,13 +256,18 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
           rasFids.AddFiducial(x, y, z)
 
           #@John: Only 6 fiducals created for 'toFiducials'
+<<<<<<< HEAD
           #@ Raniem: make the difference variable
           if  i < numPoints-diff:
+=======
+          if not i > numPoints-3:
+>>>>>>> e16cebc87dd7bff3eb1f76d6a7169042b82e4a06
               xx = x+noise[i*3]
               yy = y+noise[i*3+1]
               zz = z+noise[i*3+2]
               refFids.AddFiducial(xx, yy, zz)
 
+<<<<<<< HEAD
 '''
 @ Raniem this method should test the registration with both missing points and missed up order
  added a new parameter diff: an integer number represent : size('fromFiducials') - size('toFiducials')
@@ -284,6 +311,11 @@ def generatePoints2(self, numPoints,diff, Scale, Sigma):
           refFids.AddFiducial(xx, yy, zz)
 
 def setUp(self):
+=======
+
+
+  def setUp(self):
+>>>>>>> e16cebc87dd7bff3eb1f76d6a7169042b82e4a06
     """ Do whatever is needed to reset the state - typically a scene clear will be enough.
     """
     slicer.mrmlScene.Clear(0)
@@ -310,6 +342,7 @@ def test_SurgeryToolkit1(self):
     #
     # first, get some data
     #
+<<<<<<< HEAD
     self.generatePoints1(8,2, 100, 3)
 
 def test_SurgeryToolkit2(self):
@@ -330,3 +363,6 @@ def test_SurgeryToolkit2(self):
     #
     self.generatePoints2(50, 10, 100, 3)
 
+=======
+    self.generatePoints(8, 100, 3)
+>>>>>>> e16cebc87dd7bff3eb1f76d6a7169042b82e4a06
