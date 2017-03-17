@@ -184,6 +184,13 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
         landmarkTransform.Update()
         landmarkTransform.GetMatrix(alphaToBetaMatrix)
 
+    def fiducialsToPoints(self, fiducials, points):
+        n = fiducials.GetNumberOfFiducials()
+        for i in range(n):
+            p = [0,0,0]
+            fiducials.GetNthFiducialPosition(i, p)
+            points.InsertNextPoint(p[0], p[1], p[2])
+
 
 
 
