@@ -148,8 +148,33 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
         checking the average distance (root mean square distance), each time and find the minimum RMS Distance.
         This is a greedy algorithm, and will be implmented as such.
         """
-        x = 0
-        return x
+        referenceToRas = slicer.vtkMRMLLinearTransformNode()
+        referenceToRas.SetName('ReferenceToRas')
+        slicer.mrmlScene.AddNode(referenceToRas)
+
+        rasFids = slicer.util.getNode("fromFiducials")
+        refFids = slicer.util.getNode('toFiducials')
+
+        refPoints = vtk.vtkPoints()
+        rasPoints = vtk.vtkPoints()
+
+        self.fiducialsToPoints(rasFids, rasPoints)
+        self.fiducialsToPoints(refFids, refPoints)
+
+        referenceToRasMatrix = vtk.vtkMatrix4x4()
+
+        self.rigidRegistration(refPoints, rasPoints, referenceToRasMatrix)
+        det = referenceToRasMatrix.Determinant()
+
+        if det < 1e-8:
+            print 'Unstable registration. Check input for collinear points.'
+
+        # Is using referenceToRas necessary here?
+
+        referenceToRas.SetMatrixTransformToParent(referenceToRasMatrix)
+        avgDistance = self.averageTransformedDistance(refPoints, rasPoints, referenceToRasMatrix)
+        print "Avg Distance: " + str(avgDistance)
+        return
 
     def averageTransformedDistance(self, alphaPoints, betaPoints, alphaToBetaMatrix):
         average = 0
@@ -157,10 +182,8 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
 
         numberOfPoints = alphaPoints.GetNumberOfPoints()
         bNum = betaPoints.GetNumberOfPoints()
-
-        if numberOfPoints != bNum:
-            logging.error('number of points in two lists do not match')
-            return -1
+        if numberOfPoints > bNum:
+            numberOfPoints = bNum
 
         for i in range(numberOfPoints):
             num = num + 1
@@ -172,7 +195,7 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
             pointB_Beta = numpy.array(b)
             pointB_Beta = numpy.append(pointB_Beta, 1)
             distance = numpy.linalg.norm(pointA_Beta - pointB_Beta)
-            average = average+ (distance-average) / num
+            average = average + (distance-average) / num
 
         return average
 
@@ -275,7 +298,9 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
     """
 
     self.delayDisplay("Starting the test")
-    #
-    # first, get some data
-    #
+
+    logic = SurgeryToolkitLogic()
     self.generatePoints(8, 100, 3)
+    logic.fiduciaryRegistration()
+
+
