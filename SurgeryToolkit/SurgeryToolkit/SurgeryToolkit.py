@@ -4,6 +4,7 @@ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
 import numpy
+from itertools import permutations
 
 #
 # SurgeryToolkit
@@ -177,7 +178,7 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
         return
 
     def averageTransformedDistance(self, alphaPoints, betaPoints, alphaToBetaMatrix):
-        average = 0
+        min_average = 0
         num = 0
 
         numberOfPoints = alphaPoints.GetNumberOfPoints()
@@ -190,14 +191,18 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
             a = alphaPoints.GetPoint(i)
             pointA_Alpha = numpy.array(a)
             pointA_Alpha = numpy.append(pointA_Alpha, 1)
+            # whats the point of pointA_Beta?
             pointA_Beta = alphaToBetaMatrix.MultiplyFloatPoint(pointA_Alpha)
             b = betaPoints.GetPoint(i)
             pointB_Beta = numpy.array(b)
             pointB_Beta = numpy.append(pointB_Beta, 1)
-            distance = numpy.linalg.norm(pointA_Beta - pointB_Beta)
-            average = average + (distance-average) / num
+            average = 1
+            for perm_pointA_Beta in permutations(pointA_Alpha):
+                distance = numpy.linalg.norm(perm_pointA_Beta - pointB_Beta)
+                average = average + (distance-average) / num
+                min_average = min(average, min_average)
 
-        return average
+        return min_average
 
     def rigidRegistration(self, alphaPoints, betaPoints, alphaToBetaMatrix):
         landmarkTransform = vtk.vtkLandmarkTransform()
