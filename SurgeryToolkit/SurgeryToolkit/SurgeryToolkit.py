@@ -140,7 +140,7 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
         these permutations, and record the FRE. The combination/permutation of the lowest FRE value is probably the right one.
         To generate permutations and combinations, google python permutation and python combination.
     """
-    def fiduciaryRegistration(self):
+    def fiducialRegistration(self):
         """
         @John Martin
         Input: two fiducial lists
@@ -176,20 +176,6 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
             self.generateCombinations(targetCount, combination_arr)
             self.findOverallMinTransform(refPoints, rasPoints, referenceToRasMatrix, combination_arr, False)
 
-        # # need to filter the points before registration (missing)
-        # # need to register in order to compute distance
-        # self.rigidRegistration(refPoints, rasPoints, referenceToRasMatrix)
-        # det = referenceToRasMatrix.Determinant()
-        #
-        # if det < 1e-8:
-        #     print 'Unstable registration. Check input for collinear points.'
-        #
-        # # Is using referenceToRas necessary here?
-        # referenceToRas.SetMatrixTransformToParent(referenceToRasMatrix)
-        #
-        # avgDistance = self.averageTransformedDistance(refPoints, rasPoints, referenceToRasMatrix)
-        # print "Avg Distance: " + str(avgDistance)
-        # return
 
     def findOverallMinTransform(self, largerPoints, smallerPoints, referenceToRasMatrix, combination_arr, reverse):
         minDistance = sys.maxint
@@ -354,6 +340,6 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
 
     logic = SurgeryToolkitLogic()
     self.generatePoints(8, 100, 3)
-    logic.fiduciaryRegistration()
+    logic.fiducialRegistration()
 
 
