@@ -4,6 +4,8 @@ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
 import numpy
+import sys
+from itertools import permutations
 from random import shuffle
 
 #
@@ -139,7 +141,7 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
         these permutations, and record the FRE. The combination/permutation of the lowest FRE value is probably the right one.
         To generate permutations and combinations, google python permutation and python combination.
     """
-    def fiduciaryRegistration(self):
+    def fiducialRegistration(self):
         """
         @John Martin
         Input: two fiducial lists
@@ -149,8 +151,57 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
         checking the average distance (root mean square distance), each time and find the minimum RMS Distance.
         This is a greedy algorithm, and will be implmented as such.
         """
-        x = 0
-        return x
+        referenceToRas = slicer.vtkMRMLLinearTransformNode()
+        referenceToRas.SetName('ReferenceToRas')
+        slicer.mrmlScene.AddNode(referenceToRas)
+
+        rasFids = slicer.util.getNode("fromFiducials")
+        refFids = slicer.util.getNode('toFiducials')
+
+        refPoints = vtk.vtkPoints()
+        rasPoints = vtk.vtkPoints()
+
+        self.fiducialsToPoints(rasFids, rasPoints)
+        self.fiducialsToPoints(refFids, refPoints)
+
+        sourceCount = rasPoints.GetNumberOfPoints()
+        targetCount = refPoints.GetNumberOfPoints()
+
+        combination_arr = []
+        referenceToRasMatrix = vtk.vtkMatrix4x4()
+
+        if sourceCount > targetCount:
+            self.generateCombinations(sourceCount, combination_arr)
+            self.findOverallMinTransform(rasPoints, refPoints, referenceToRasMatrix, combination_arr, True)
+        else:
+            self.generateCombinations(targetCount, combination_arr)
+            self.findOverallMinTransform(refPoints, rasPoints, referenceToRasMatrix, combination_arr, False)
+
+
+    def findOverallMinTransform(self, largerPoints, smallerPoints, referenceToRasMatrix, combination_arr, reverse):
+        minDistance = sys.maxint
+        minTransformMatrix = vtk.vtkMatrix4x4()
+        # do i need to delete refrenceToRasMatrix each iteration? for avgtransformedDistance calculation.. probably not
+
+        for i in combination_arr:
+            newPointsList = vtk.vtkPoints()
+            distance = 0
+            # Construct new points list from combination
+            for j in range(len(i)):
+                if i[j] == 1:
+                    newPointsList.InsertNextPoint(largerPoints.GetPoint(j))
+            if not reverse:
+                self.rigidRegistration(newPointsList, smallerPoints, referenceToRasMatrix)
+                distance = self.averageTransformedDistance(newPointsList, smallerPoints, referenceToRasMatrix)
+            else:
+                self.rigidRegistration(smallerPoints, newPointsList, referenceToRasMatrix)
+                distance = self.averageTransformedDistance(smallerPoints, newPointsList, referenceToRasMatrix)
+            # print distance
+            if distance < minDistance:
+                minDistance = distance
+                minTransformMatrix = referenceToRasMatrix
+        print minDistance
+
 
     def averageTransformedDistance(self, alphaPoints, betaPoints, alphaToBetaMatrix):
         average = 0
@@ -173,7 +224,7 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
             pointB_Beta = numpy.array(b)
             pointB_Beta = numpy.append(pointB_Beta, 1)
             distance = numpy.linalg.norm(pointA_Beta - pointB_Beta)
-            average = average+ (distance-average) / num
+            average = average + (distance-average) / num
 
         return average
 
@@ -192,8 +243,15 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
             fiducials.GetNthFiducialPosition(i, p)
             points.InsertNextPoint(p[0], p[1], p[2])
 
-
-
+    def generateCombinations(self, largerCount, combination_arr):
+        data = [1] * largerCount
+        for i in range(largerCount):
+            data[i] = 0
+            for j in range(i+1, largerCount):
+                data[j] = 0
+                combination_arr.append(data[:])
+                data[j] = 1
+            data[i] = 1
 
 
 class SurgeryToolkitTest(ScriptedLoadableModuleTest):
@@ -314,10 +372,10 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
     """
 
     self.delayDisplay("Starting the test")
-    #
-    # first, get some data
-    #
+
+    logic = SurgeryToolkitLogic()
     self.generatePoints(8, 100, 3)
+    logic.fiducialRegistration()
     
   def runTest(self):
     """Run as few or as many tests as needed here.
