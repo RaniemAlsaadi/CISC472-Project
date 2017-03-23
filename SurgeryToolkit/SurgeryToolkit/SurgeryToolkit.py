@@ -504,4 +504,86 @@ def test_SurgeryToolkit3_CHART(self):
     # Tell the Chart View which Chart to display
     cvn.SetChartNodeID(cn.GetID())
 
+def test_SurgeryToolkit4_CHART(self):
+    # Switch to a layout (24) that contains a Chart View to initiate the construction of the widget and Chart View Node
+    lns = slicer.mrmlScene.GetNodesByClass('vtkMRMLLayoutNode')
+    lns.InitTraversal()
+    ln = lns.GetNextItemAsObject()
+    ln.SetViewArrangement(24)
 
+    # Get the Chart View Node
+    cvns = slicer.mrmlScene.GetNodesByClass('vtkMRMLChartViewNode')
+    cvns.InitTraversal()
+    cvn = cvns.GetNextItemAsObject()
+
+    self.delayDisplay("Starting the test")
+
+    referenceToRas = slicer.vtkMRMLLinearTransformNode()
+    referenceToRas.SetName('ReferenceToRas2')
+    slicer.mrmlScene.AddNode(referenceToRas)
+
+    createModelsLogic = slicer.modules.createmodels.logic()
+    rasCoordinateModel = createModelsLogic.CreateCoordinate(25, 2)
+    rasCoordinateModel.SetName('RasCoordinateModel2')
+    referenceCoordinateModel = createModelsLogic.CreateCoordinate(20, 2)
+    referenceCoordinateModel.SetName('ReferenceCoordinateModel2')
+    referenceCoordinateModel.SetAndObserveTransformNodeID(referenceToRas.GetID())
+
+    rasCoordinateModel.GetDisplayNode().SetColor(1, 0, 0)
+    referenceCoordinateModel.GetDisplayNode().SetColor(0, 0, 1)
+
+    refPoints = vtk.vtkPoints()
+    rasPoints = vtk.vtkPoints()
+
+    logic = SurgeryToolkitLogic()
+
+    tre_list = []
+    for i in range(10):
+        N = 10 + i * 5   # increment the first list size by 5 in each iteration
+        diff = 2 + i*2    # start with a difference 2 between the 2 lists to be registered and increase by multible of 2
+        Sigma = 3
+        Scale = 100
+        self.generatePoints1(N,diff, Scale, Sigma)
+        rasFids = slicer.util.getNode("fromFiducials")
+        refFids = slicer.util.getNode('toFiducials')
+        self.fiducialsToPoints(rasFids, rasPoints)
+        self.fiducialsToPoints(refFids, refPoints)
+        referenceToRasMatrix = vtk.vtkMatrix4x4()
+        logic.rigidRegistration(refPoints, rasPoints, referenceToRasMatrix)
+        det = referenceToRasMatrix.Determinant()
+        if det < 1e-8:
+            print 'Unstable registration. Check input for collinear points.'
+            continue
+        referenceToRas.SetMatrixTransformToParent(referenceToRasMatrix)
+        avgDistance = logic.averageTransformedDistance(refPoints, rasPoints, referenceToRasMatrix)
+        print "Avg Distance: " + str(avgDistance)
+        targetPoint_Ras = numpy.array([0,0,0,1])
+        targetPoint_Reference = referenceToRasMatrix.MultiplyFloatPoint(targetPoint_Ras)
+        targetPoint_Reference = numpy.array(targetPoint_Reference)
+        tre = numpy.linalg.norm(targetPoint_Ras - targetPoint_Reference)
+        tre_list.append(tre)
+        print "TRE: " + str(tre)
+        print ""
+
+    # Create an Array Node and add some data
+    dn = slicer.mrmlScene.AddNode(slicer.vtkMRMLDoubleArrayNode())
+    a = dn.GetArray()
+    a.SetNumberOfTuples(10)
+    for i in range(10):
+        a.SetComponent(i, 0, (10 + i * 5))
+        a.SetComponent(i, 1, 2 + i*2)
+        a.SetComponent(i, 2, tre_list[i])
+
+    cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
+    # Add the Array Nodes to the Chart. The first argument is a string used for the legend and to refer to the Array when setting properties.
+    cn.AddArray('TRE', dn.GetID())
+
+    # Set a few properties on the Chart. The first argument is a string identifying which Array to assign the property.
+    # 'default' is used to assign a property to the Chart itself (as opposed to an Array Node).
+    cn.SetProperty('default', 'title', 'Total registration error function')
+    cn.SetProperty('default', 'xAxisLabel', 'Points in registration')
+    cn.SetProperty('default', 'yAxisLabel', 'Difference')
+    cn.SetProperty('default', 'zAxisLabel', 'TRE')
+
+    # Tell the Chart View which Chart to display
+    cvn.SetChartNodeID(cn.GetID())
