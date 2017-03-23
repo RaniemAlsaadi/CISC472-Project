@@ -200,8 +200,8 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
             newPointsList = vtk.vtkPoints()
             distance = 0
             # Construct new points list from combination
-            for j in i:
-                if j == 1:
+            for j in range(len(i)):
+                if i[j] == 1:
                     newPointsList.InsertNextPoint(largerPoints.GetPoint(j))
             if not reverse:
                 self.rigidRegistration(newPointsList, smallerPoints, referenceToRasMatrix)
