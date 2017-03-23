@@ -4,6 +4,7 @@ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
 import numpy
+import sys
 from itertools import permutations
 
 #
@@ -162,47 +163,83 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
         self.fiducialsToPoints(rasFids, rasPoints)
         self.fiducialsToPoints(refFids, refPoints)
 
+        sourceCount = rasPoints.GetNumberOfPoints()
+        targetCount = refPoints.GetNumberOfPoints()
+
+        combination_arr = []
         referenceToRasMatrix = vtk.vtkMatrix4x4()
 
-        self.rigidRegistration(refPoints, rasPoints, referenceToRasMatrix)
-        det = referenceToRasMatrix.Determinant()
+        if sourceCount > targetCount:
+            self.generateCombinations(sourceCount, combination_arr)
+            self.findOverallMinTransform(rasPoints, refPoints, referenceToRasMatrix, combination_arr, True)
+        else:
+            self.generateCombinations(targetCount, combination_arr)
+            self.findOverallMinTransform(refPoints, rasPoints, referenceToRasMatrix, combination_arr, False)
 
-        if det < 1e-8:
-            print 'Unstable registration. Check input for collinear points.'
+        # # need to filter the points before registration (missing)
+        # # need to register in order to compute distance
+        # self.rigidRegistration(refPoints, rasPoints, referenceToRasMatrix)
+        # det = referenceToRasMatrix.Determinant()
+        #
+        # if det < 1e-8:
+        #     print 'Unstable registration. Check input for collinear points.'
+        #
+        # # Is using referenceToRas necessary here?
+        # referenceToRas.SetMatrixTransformToParent(referenceToRasMatrix)
+        #
+        # avgDistance = self.averageTransformedDistance(refPoints, rasPoints, referenceToRasMatrix)
+        # print "Avg Distance: " + str(avgDistance)
+        # return
 
-        # Is using referenceToRas necessary here?
+    def findOverallMinTransform(self, largerPoints, smallerPoints, referenceToRasMatrix, combination_arr, reverse):
+        minDistance = sys.maxint
+        minTransformMatrix = vtk.vtkMatrix4x4()
+        # do i need to delete refrenceToRasMatrix each iteration? for avgtransformedDistance calculation.. probably not
 
-        referenceToRas.SetMatrixTransformToParent(referenceToRasMatrix)
-        avgDistance = self.averageTransformedDistance(refPoints, rasPoints, referenceToRasMatrix)
-        print "Avg Distance: " + str(avgDistance)
-        return
+        for i in combination_arr:
+            newPointsList = vtk.vtkPoints()
+            distance = 0
+            # Construct new points list from combination
+            for j in i:
+                if j == 1:
+                    newPointsList.InsertNextPoint(largerPoints.GetPoint(j))
+            if not reverse:
+                self.rigidRegistration(newPointsList, smallerPoints, referenceToRasMatrix)
+                distance = self.averageTransformedDistance(newPointsList, smallerPoints, referenceToRasMatrix)
+            else:
+                self.rigidRegistration(smallerPoints, newPointsList, referenceToRasMatrix)
+                distance = self.averageTransformedDistance(smallerPoints, newPointsList, referenceToRasMatrix)
+            # print distance
+            if distance < minDistance:
+                minDistance = distance
+                minTransformMatrix = referenceToRasMatrix
+        print minDistance
+
 
     def averageTransformedDistance(self, alphaPoints, betaPoints, alphaToBetaMatrix):
-        min_average = 0
+        average = 0
         num = 0
 
         numberOfPoints = alphaPoints.GetNumberOfPoints()
         bNum = betaPoints.GetNumberOfPoints()
-        if numberOfPoints > bNum:
-            numberOfPoints = bNum
+
+        if numberOfPoints != bNum:
+            logging.error('number of points in two lists do not match')
+            return -1
 
         for i in range(numberOfPoints):
             num = num + 1
             a = alphaPoints.GetPoint(i)
             pointA_Alpha = numpy.array(a)
             pointA_Alpha = numpy.append(pointA_Alpha, 1)
-            # whats the point of pointA_Beta?
             pointA_Beta = alphaToBetaMatrix.MultiplyFloatPoint(pointA_Alpha)
             b = betaPoints.GetPoint(i)
             pointB_Beta = numpy.array(b)
             pointB_Beta = numpy.append(pointB_Beta, 1)
-            average = 1
-            for perm_pointA_Beta in permutations(pointA_Alpha):
-                distance = numpy.linalg.norm(perm_pointA_Beta - pointB_Beta)
-                average = average + (distance-average) / num
-                min_average = min(average, min_average)
+            distance = numpy.linalg.norm(pointA_Beta - pointB_Beta)
+            average = average + (distance-average) / num
 
-        return min_average
+        return average
 
     def rigidRegistration(self, alphaPoints, betaPoints, alphaToBetaMatrix):
         landmarkTransform = vtk.vtkLandmarkTransform()
@@ -218,6 +255,17 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
             p = [0,0,0]
             fiducials.GetNthFiducialPosition(i, p)
             points.InsertNextPoint(p[0], p[1], p[2])
+
+    def generateCombinations(self, largerCount, combination_arr):
+        data = [1] * largerCount
+        for i in range(largerCount):
+            data[i] = 0
+            for j in range(i+1, largerCount):
+                data[j] = 0
+                combination_arr.append(data[:])
+                data[j] = 1
+            data[i] = 1
+
 
 
 
