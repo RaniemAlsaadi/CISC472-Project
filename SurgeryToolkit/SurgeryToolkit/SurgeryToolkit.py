@@ -6,6 +6,7 @@ import logging
 import numpy
 import sys
 from itertools import permutations
+from random import shuffle
 
 #
 # SurgeryToolkit
@@ -253,10 +254,6 @@ class SurgeryToolkitLogic(ScriptedLoadableModuleLogic):
             data[i] = 1
 
 
-
-
-
-
 class SurgeryToolkitTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
@@ -270,9 +267,11 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
   This function is used to create the first test case which generates two fiducial lists one
   with 8 points and the second one is created by adding noise to the first list and reorder the points
   the second list just have 6 elements to test the registration with missing points and missed up order
+  @Raniem this test doesn't change the order it only test missing points.
+  added a new parameter diff: an integer number represent : size('fromFiducials') - size('toFiducials')
   """
 
-  def generatePoints(self, numPoints, Scale, Sigma):
+  def generatePoints1(self, numPoints,diff, Scale, Sigma):
       rasFids = slicer.util.getNode('fromFiducials')
       if rasFids == None:
           rasFids = slicer.vtkMRMLMarkupsFiducialNode()
@@ -291,12 +290,7 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
       fromNormCoordinates = numpy.random.rand(numPoints, 3)
 
       noise = numpy.random.normal(0.0, Sigma, numPoints*3)
-
-      #@John: It is not clear what the purpose of tempPoints is
-
-      # create temporary points
-      tempPoints = vtk.vtkPoints()
-
+          
       # create the reference points
       for i in range(numPoints):
           x = (fromNormCoordinates[i, 0] - 0.5) * Scale
@@ -305,13 +299,54 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
           rasFids.AddFiducial(x, y, z)
 
           #@John: Only 6 fiducals created for 'toFiducials'
-          if not i > numPoints-3:
+          #@ Raniem: make the difference variable
+          if  i < numPoints-diff:
               xx = x+noise[i*3]
               yy = y+noise[i*3+1]
               zz = z+noise[i*3+2]
               refFids.AddFiducial(xx, yy, zz)
 
+  '''
+  @ Raniem this method should test the registration with both missing points and missed up order
+  added a new parameter diff: an integer number represent : size('fromFiducials') - size('toFiducials')
+  '''
+  def generatePoints2(self, numPoints,diff, Scale, Sigma):
+      rasFids = slicer.util.getNode('fromFiducials')
+      if rasFids == None:
+          rasFids = slicer.vtkMRMLMarkupsFiducialNode()
+          rasFids.SetName('fromFiducials')
+          slicer.mrmlScene.AddNode(rasFids)
+      rasFids.RemoveAllMarkups()
 
+      refFids = slicer.util.getNode('toFiducials')
+      if refFids == None:
+          refFids = slicer.vtkMRMLMarkupsFiducialNode()
+          refFids.SetName('toFiducials')
+          slicer.mrmlScene.AddNode(refFids)
+      refFids.RemoveAllMarkups()
+      refFids.GetDisplayNode().SetSelectedColor(1,1,0)
+
+      fromNormCoordinates = numpy.random.rand(numPoints, 3)
+
+      noise = numpy.random.normal(0.0, Sigma, numPoints*3)
+          
+               
+      for i in range(numPoints):
+          x = (fromNormCoordinates[i, 0] - 0.5) * Scale
+          y = (fromNormCoordinates[i, 1] - 0.5) * Scale
+          z = (fromNormCoordinates[i, 2] - 0.5) * Scale
+          rasFids.AddFiducial(x, y, z)
+          
+      #@ Raniem this second loop is needed to shuffle the order of points in rasFids and refFids
+      indexes = list(range(numPoints))      
+      shuffle(indexes) # randomize the points indexes.
+      for i in range(numPoints-diff):   #numPoints-diff: to have different sizes for the two lists - missing points test          
+          p = [0,0,0]
+          rasFids.GetNthFiducialPosition(indexes[i], p)  # get a random point from rasFids and add it in different order in refFids
+          xx = p[0]+noise[i*3]
+          yy = p[1]+noise[i*3+1]
+          zz = p[2]+noise[i*3+2]      
+          refFids.AddFiducial(xx, yy, zz)
 
   def setUp(self):
     """ Do whatever is needed to reset the state - typically a scene clear will be enough.
@@ -341,5 +376,132 @@ class SurgeryToolkitTest(ScriptedLoadableModuleTest):
     logic = SurgeryToolkitLogic()
     self.generatePoints(8, 100, 3)
     logic.fiducialRegistration()
+    
+  def runTest(self):
+    """Run as few or as many tests as needed here.
+    """
+    self.setUp()
+    self.test_SurgeryToolkit1()
+
+  def test_SurgeryToolkit1(self):
+    """ Ideally you should have several levels of tests.  At the lowest level
+    tests should exercise the functionality of the logic with different inputs
+    (both valid and invalid).  At higher levels your tests should emulate the
+    way the user would interact with your code and confirm that it still works
+    the way you intended.
+    One of the most important features of the tests is that it should alert other
+    developers when their changes will have an impact on the behavior of your
+    module.  For example, if a developer removes a feature that you depend on,
+    your test should break so they know that the feature is needed.
+    """
+
+    self.delayDisplay("Starting the test")
+    #
+    # first, get some data
+    #
+    self.generatePoints1(8,2, 100, 3)
+
+def test_SurgeryToolkit2(self):
+    """ Ideally you should have several levels of tests.  At the lowest level
+    tests should exercise the functionality of the logic with different inputs
+    (both valid and invalid).  At higher levels your tests should emulate the
+    way the user would interact with your code and confirm that it still works
+    the way you intended.
+    One of the most important features of the tests is that it should alert other
+    developers when their changes will have an impact on the behavior of your
+    module.  For example, if a developer removes a feature that you depend on,
+    your test should break so they know that the feature is needed.
+    """
+
+    self.delayDisplay("Starting the test")
+    #
+    # first, get some data
+    #
+    self.generatePoints2(50, 10, 100, 3)
+
+def test_SurgeryToolkit3_CHART(self):
+    # Switch to a layout (24) that contains a Chart View to initiate the construction of the widget and Chart View Node
+    lns = slicer.mrmlScene.GetNodesByClass('vtkMRMLLayoutNode')
+    lns.InitTraversal()
+    ln = lns.GetNextItemAsObject()
+    ln.SetViewArrangement(24)
+
+    # Get the Chart View Node
+    cvns = slicer.mrmlScene.GetNodesByClass('vtkMRMLChartViewNode')
+    cvns.InitTraversal()
+    cvn = cvns.GetNextItemAsObject()
+
+    self.delayDisplay("Starting the test")
+
+    referenceToRas = slicer.vtkMRMLLinearTransformNode()
+    referenceToRas.SetName('ReferenceToRas')
+    slicer.mrmlScene.AddNode(referenceToRas)
+
+    createModelsLogic = slicer.modules.createmodels.logic()
+    rasCoordinateModel = createModelsLogic.CreateCoordinate(25, 2)
+    rasCoordinateModel.SetName('RasCoordinateModel')
+    referenceCoordinateModel = createModelsLogic.CreateCoordinate(20, 2)
+    referenceCoordinateModel.SetName('ReferenceCoordinateModel')
+    referenceCoordinateModel.SetAndObserveTransformNodeID(referenceToRas.GetID())
+
+    rasCoordinateModel.GetDisplayNode().SetColor(1, 0, 0)
+    referenceCoordinateModel.GetDisplayNode().SetColor(0, 0, 1)
+
+    refPoints = vtk.vtkPoints()
+    rasPoints = vtk.vtkPoints()
+
+    logic = SurgeryToolkitLogic()
+
+    tre_list = []
+    for i in range(10):
+        N = 10 + i * 5   # increment the first list size by 5 in each iteration
+        diff = 2 + i*2    # start with a difference 2 between the 2 lists to be registered and increase by multible of 2
+        Sigma = 3
+        Scale = 100
+        self.generatePoints2(N,diff, Scale, Sigma)
+        rasFids = slicer.util.getNode("fromFiducials")
+        refFids = slicer.util.getNode('toFiducials')
+        self.fiducialsToPoints(rasFids, rasPoints)
+        self.fiducialsToPoints(refFids, refPoints)
+        referenceToRasMatrix = vtk.vtkMatrix4x4()
+        logic.rigidRegistration(refPoints, rasPoints, referenceToRasMatrix)
+        det = referenceToRasMatrix.Determinant()
+        if det < 1e-8:
+            print 'Unstable registration. Check input for collinear points.'
+            continue
+        referenceToRas.SetMatrixTransformToParent(referenceToRasMatrix)
+        avgDistance = logic.averageTransformedDistance(refPoints, rasPoints, referenceToRasMatrix)
+        print "Avg Distance: " + str(avgDistance)
+        targetPoint_Ras = numpy.array([0,0,0,1])
+        targetPoint_Reference = referenceToRasMatrix.MultiplyFloatPoint(targetPoint_Ras)
+        targetPoint_Reference = numpy.array(targetPoint_Reference)
+        tre = numpy.linalg.norm(targetPoint_Ras - targetPoint_Reference)
+        tre_list.append(tre)
+        print "TRE: " + str(tre)
+        print ""
+
+    # Create an Array Node and add some data
+    dn = slicer.mrmlScene.AddNode(slicer.vtkMRMLDoubleArrayNode())
+    a = dn.GetArray()
+    a.SetNumberOfTuples(10)
+    x = range(0, 10)
+    for i in range(len(x)):
+        a.SetComponent(i, 0, (10 + i * 5))
+        a.SetComponent(i, 1, 2 + i*2)
+        a.SetComponent(i, 2, tre_list[i])
+
+    cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
+    # Add the Array Nodes to the Chart. The first argument is a string used for the legend and to refer to the Array when setting properties.
+    cn.AddArray('TRE', dn.GetID())
+
+    # Set a few properties on the Chart. The first argument is a string identifying which Array to assign the property.
+    # 'default' is used to assign a property to the Chart itself (as opposed to an Array Node).
+    cn.SetProperty('default', 'title', 'Total registration error function')
+    cn.SetProperty('default', 'xAxisLabel', 'Points in registration')
+    cn.SetProperty('default', 'yAxisLabel', 'Difference')
+    cn.SetProperty('default', 'zAxisLabel', 'TRE')
+
+    # Tell the Chart View which Chart to display
+    cvn.SetChartNodeID(cn.GetID())
 
 
